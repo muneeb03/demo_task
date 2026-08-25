@@ -1,0 +1,37 @@
+{
+  "name": "crypto-ledger-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simulated crypto ledger REST API with concurrency-safe withdrawals and idempotency",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "db:up": "docker compose up -d --wait db",
+    "docker:up": "docker compose up -d --build --wait",
+    "docker:down": "docker compose down -v",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run db:up && jest --runInBand",
+    "test:only": "jest --runInBand"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.17.10",
+    "@types/pg": "^8.11.10",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

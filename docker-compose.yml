@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ledger-db
+    environment:
+      POSTGRES_USER: ledger
+      POSTGRES_PASSWORD: ledger
+      POSTGRES_DB: ledger
+    # 5433 on the host so this never collides with a locally installed Postgres,
+    # and so the test suite can reach it without going through the api container.
+    ports:
+      - '5433:5432'
+    volumes:
+      - ledger-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ledger -d ledger']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    container_name: ledger-api
+    # Waits for Postgres to pass its healthcheck, so startup migrations cannot race it.
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://ledger:ledger@db:5432/ledger
+      PORT: '3000'
+    ports:
+      - '3000:3000'
+
+volumes:
+  ledger-pgdata:
