@@ -1,3 +1,5 @@
+// The HTTP surface. Each handler validates, calls the service, and maps the result --
+// no business logic and no SQL, so the rules stay in one place.
 import { Router, type Request, type RequestHandler, type Response } from 'express';
 import { toAccount, toTransaction } from './models';
 import { createAccount, getAccount, listTransactions, withdraw } from './service';

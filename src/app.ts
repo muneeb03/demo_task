@@ -1,3 +1,5 @@
+// Express wiring. Order matters: routes, then the 404 catch-all, then the error handler.
+// Exports a ready-made app so the tests can drive it in-process without binding a port.
 import express, { type ErrorRequestHandler, type Express, type RequestHandler } from 'express';
 import { ApiError } from './errors';
 import { router } from './routes';

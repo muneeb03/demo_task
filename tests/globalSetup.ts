@@ -1,3 +1,6 @@
+// Runs once before the suite: wait for Postgres, create the database, apply the schema,
+// truncate. Truncation is per run rather than per test, which is why every test creates
+// its own account and why helpers.uniqueKey() exists.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client } from 'pg';

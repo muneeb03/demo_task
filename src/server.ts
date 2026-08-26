@@ -1,3 +1,4 @@
+// Process entry point. Kept apart from app.ts so importing the app never starts a server.
 import { app } from './app';
 import { pool } from './db';
 import { migrate } from './migrate';

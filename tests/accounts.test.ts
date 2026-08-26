@@ -1,9 +1,11 @@
+// Account basics, plus the precision guarantee that justifies treating money as strings.
 import { api, createAccount, getBalance, uniqueKey, VALID_ERC20, withdraw } from './helpers';
 
 describe('accounts', () => {
   it('creates an account and returns it', async () => {
     const res = await api().post('/accounts').send({ owner: 'Ada Lovelace', balance: 1250.75 }).expect(201);
 
+    // toEqual, not toMatchObject: an accidentally exposed field would fail this.
     expect(res.body).toEqual({
       id: expect.stringMatching(/^[0-9a-f-]{36}$/),
       owner: 'Ada Lovelace',

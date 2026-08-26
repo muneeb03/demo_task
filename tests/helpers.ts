@@ -1,3 +1,5 @@
+// The shared vocabulary the tests are written in. The wrappers assert the boring status
+// codes, so a test only spells out a status when the status is the point.
 import request from 'supertest';
 import type { Test } from 'supertest';
 import { app } from '../src/app';
@@ -26,6 +28,8 @@ export interface TransactionBody {
   createdAt: string;
 }
 
+// The database is truncated once per run, not between tests, so a hard-coded key would be
+// replayed by whichever test ran second. pid separates workers, the counter separates tests.
 let counter = 0;
 export const uniqueKey = (label: string): string => `${label}-${process.pid}-${++counter}`;
 
@@ -34,6 +38,8 @@ export async function createAccount(owner: string, balance: number): Promise<Acc
   return res.body as AccountBody;
 }
 
+/** Returns the un-awaited request so the caller picks the expected status -- and so the
+ *  concurrency tests can start ten of them at once. */
 export function withdraw(
   accountId: string,
   body: Record<string, unknown>,

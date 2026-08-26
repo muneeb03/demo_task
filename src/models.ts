@@ -1,3 +1,5 @@
+// Database rows in, HTTP responses out. Two separate shapes on purpose: a new column
+// cannot leak into the API just because it was added to the table.
 import type { Network } from './validation';
 
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
