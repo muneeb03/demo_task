@@ -28,3 +28,23 @@ CREATE TABLE IF NOT EXISTS transactions (
 
 CREATE INDEX IF NOT EXISTS transactions_account_created_idx
   ON transactions (account_id, created_at DESC, id DESC);
+
+-- Added with the web UI: a signed-in Google identity and the one ledger account it owns.
+CREATE TABLE IF NOT EXISTS users (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- Google's `sub` claim, not the email: an email can be reassigned, `sub` never is.
+  google_sub text        NOT NULL UNIQUE,
+  email      text        NOT NULL,
+  name       text        NOT NULL DEFAULT '',
+  picture    text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Nullable on purpose. A NULL owner is an anonymous account created through the public
+-- POST /accounts, exactly as before; a non-NULL owner is claimed by a Google identity and
+-- is reachable only with that user's session (src/routes.ts).
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES users (id) ON DELETE CASCADE;
+
+-- One account per user. Postgres treats NULLs as distinct, so every anonymous account
+-- still coexists happily under this constraint.
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_user_id_key ON accounts (user_id);

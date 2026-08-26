@@ -2,7 +2,7 @@
   "name": "crypto-ledger-api",
   "version": "1.0.0",
   "private": true,
-  "description": "Simulated crypto ledger REST API with concurrency-safe withdrawals and idempotency",
+  "description": "Simulated crypto ledger with concurrency-safe withdrawals, idempotency, Google sign-in and a dependency-free web UI",
   "main": "dist/server.js",
   "engines": {
     "node": ">=18"

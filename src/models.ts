@@ -9,6 +9,8 @@ export interface AccountRow {
   id: string;
   owner: string;
   balance: string;
+  /** The Google identity that owns this account, or null for an anonymous one. */
+  user_id: string | null;
   created_at: Date;
 }
 
@@ -59,4 +61,30 @@ export const toTransaction = (row: TransactionRow): TransactionResponse => ({
   idempotencyKey: row.idempotency_key,
   status: row.status,
   createdAt: row.created_at.toISOString(),
+});
+
+/** The signed-in Google identity. `google_sub` is the stable id; the rest is display only. */
+export interface UserRow {
+  id: string;
+  google_sub: string;
+  email: string;
+  name: string;
+  picture: string | null;
+  created_at: Date;
+}
+
+export interface UserResponse {
+  id: string;
+  email: string;
+  name: string;
+  picture: string | null;
+}
+
+// google_sub stays server-side: the client already knows who it signed in as, and the id
+// Google uses for this user is not something the browser needs to carry around.
+export const toUser = (row: UserRow): UserResponse => ({
+  id: row.id,
+  email: row.email,
+  name: row.name,
+  picture: row.picture,
 });

@@ -1,0 +1,723 @@
+/* ============================================================================
+   Crypto Ledger — "Rule & Figure"
+
+   A settlement statement rendered in a browser. Structure is carried by 1px
+   hairlines and air; there is no card, no elevation and no fill larger than a
+   6px square. There is no gradient anywhere, and the three box-shadow lines
+   below are not shadows: two draw a solid inset rule, one kills Chrome's
+   autofill wash. Nothing in this file floats above anything else.
+
+   The one idea worth knowing before reading further: every amount is split into
+   an integer half and a fraction half of fixed character widths, so the decimal
+   points of "9.20", "1,250.75" and "10,000.00" land on the same vertical line.
+   That line is drawn once, down the ledger. Everything else is type and space.
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- tokens -- */
+
+:root {
+  color-scheme: light dark;
+
+  /* surfaces — warm paper, one step of raise used only for the masthead */
+  --paper: #fbfaf8;
+  --paper-raised: #ffffff;
+
+  /* hairlines: decorative → structural → control boundary.
+     --rule and --rule-strong are never the sole identifier of a control, which
+     is why they may sit below 3:1; anything bounding an input uses --field. */
+  --rule: #e3e0d9;
+  --rule-strong: #c9c5bb;
+  --field: #918c83;          /* 3.20:1 — clears WCAG 1.4.11 for control edges */
+
+  /* ink — every step clears AA at the smallest size it is used at */
+  --ink: #1a1917;            /* 16.84:1 */
+  --ink-2: #5e5c57;          /*  6.40:1 */
+  --ink-3: #6e6a62;          /*  5.16:1 */
+
+  /* one accent hue: focus, the active-network bar, the decimal axis, replay.
+     A settlement blue — the colour of a bank draft, not of a token launch. */
+  --accent: #1a4e8a;         /* 8.05:1 */
+  --accent-wash: color-mix(in oklab, var(--accent) 6%, var(--paper));
+
+  /* semantics — 6px marks and short words only, never a panel fill */
+  --success: #1d6b4c;        /* 6.18:1 */
+  --danger: #a32f2a;         /* 6.72:1 */
+  --success-wash: color-mix(in oklab, var(--success) 6%, var(--paper));
+  --danger-wash: color-mix(in oklab, var(--danger) 6%, var(--paper));
+
+  --axis: color-mix(in oklab, var(--accent) 26%, transparent);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* six steps, and nothing between them */
+  --t-micro: 0.6875rem;      /* tracked caps: eyebrows, labels, status, badges */
+  --t-xs: 0.75rem;           /* mono, sentence case: timestamps, counters, ids */
+  --t-sm: 0.8125rem;         /* errors, notice detail, supporting copy */
+  --t-base: 0.9375rem;       /* body, inputs, buttons */
+  --t-amount: 1.0625rem;     /* every amount, typed or recorded */
+  --t-hero: clamp(2.5rem, 8vw, 3.75rem);
+
+  /* 4px base, nine steps, no other value appears anywhere */
+  --s1: 0.25rem; --s2: 0.5rem;  --s3: 0.75rem; --s4: 1rem;  --s5: 1.5rem;
+  --s6: 2rem;    --s7: 3rem;    --s8: 4rem;
+
+  --r: 2px;
+  --dur-1: 120ms;                       /* colour — linear, eased colour drags */
+  --dur-2: 180ms;                       /* entrances */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Dark is not an inversion. Light is warm paper (hue ~80, a printed statement);
+   dark is cool graphite (hue ~230, a lit instrument). Ink stays warm off-white
+   rather than #fff so text reads as printed rather than as emitting light. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #101214;
+    --paper-raised: #16181b;
+
+    --rule: #262a2e;
+    --rule-strong: #3a4046;
+    --field: #636a6c;        /* 3.40:1 */
+
+    --ink: #e8e6e1;          /* 15.05:1 */
+    --ink-2: #a3a7a6;        /*  7.72:1 */
+    --ink-3: #949a99;        /*  6.56:1 */
+
+    --accent: #7fb3e8;       /*  8.51:1 */
+    --success: #5fbe93;
+    --danger: #e88a80;
+
+    /* a 6% tint vanishes against #101214 */
+    --accent-wash: color-mix(in oklab, var(--accent) 10%, var(--paper));
+    --success-wash: color-mix(in oklab, var(--success) 9%, var(--paper));
+    --danger-wash: color-mix(in oklab, var(--danger) 9%, var(--paper));
+
+    --axis: color-mix(in oklab, var(--accent) 20%, transparent);
+  }
+}
+
+/* ----------------------------------------------------------------- base -- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Several elements below set `display`, which would otherwise outrank the user
+   agent's [hidden] rule and leave a "hidden" view on screen. */
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 var(--t-base) / 1.55 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, p, fieldset, legend, figure, ol { margin: 0; padding: 0; }
+ol { list-style: none; }
+fieldset { border: 0; min-width: 0; }
+
+hr.rule {
+  height: 1px; border: 0; margin: 0;
+  background: var(--rule);
+}
+hr.rule--strong { background: var(--rule-strong); }
+
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'zero' 1, 'tnum' 1;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+.eyebrow {
+  font-size: var(--t-micro);
+  line-height: 1.15;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.wordmark {
+  font-size: var(--t-base);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.wordmark--sm { letter-spacing: 0.14em; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+/* One focus treatment, everywhere. No rule in this file sets outline: none. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r);
+}
+
+.page {
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 5vw, 3rem);
+}
+
+/* --------------------------------------------------------------- sign in -- */
+
+.signin {
+  min-height: 100dvh;
+  max-width: 72rem;
+  margin-inline: auto;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding-inline: clamp(1.25rem, 5vw, 3rem);
+}
+
+/* 20rem is the width of the one element we cannot style, so it becomes the
+   module for everything else: the rules, the wordmark and the copy all measure
+   exactly as wide as Google's button. */
+.signin__col {
+  width: min(20rem, 100%);
+  align-self: center;
+  justify-self: start;
+  padding-block: var(--s8) 8vh;
+}
+
+.signin__col .wordmark { margin-top: var(--s4); }
+.lede {
+  margin-top: var(--s2);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+
+/* A measured 3rem of nothing, bounded by rules at both ends — the emptiness is
+   deliberate and dimensioned rather than ambient. */
+.signin__slot { margin-block: var(--s7) var(--s4); }
+
+/* Google's button is a foreign object; a hairline in our own token makes it one
+   of ours in both modes, and 3px splits the difference between their 4px corner
+   and our 2px one so the two edges never read as misaligned. */
+.gis {
+  display: grid;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  min-height: 2.75rem;
+}
+.gis:empty { border-color: transparent; }
+
+.fallback {
+  border-left: 2px solid var(--accent);
+  background: var(--accent-wash);
+  padding: var(--s3) var(--s4);
+  border-radius: 0 var(--r) var(--r) 0;
+}
+.fallback__title { font-size: var(--t-sm); font-weight: 600; }
+.fallback__body {
+  margin-top: var(--s1);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+.fallback__body code {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+  color: var(--ink);
+}
+
+.note {
+  margin-top: var(--s3);
+  font-size: var(--t-micro);
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.colophon {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s4);
+  align-items: baseline;
+  min-height: 2.5rem;
+  padding-block: var(--s3);
+  border-top: 1px solid var(--rule);
+  font-size: var(--t-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.colophon--app {
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 5vw, 3rem);
+  margin-top: var(--s7);
+}
+
+/* ------------------------------------------------------------- masthead -- */
+
+.masthead {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--rule);
+}
+.masthead__inner {
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 5vw, 3rem);
+  height: 3.75rem;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s4);
+}
+
+.who { display: flex; align-items: center; gap: var(--s3); min-width: 0; }
+
+/* Square, not round: circles are social, squares are documentary. */
+.avatar {
+  width: 24px; height: 24px; flex: 0 0 auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  background: var(--paper) center / cover no-repeat;
+  display: grid; place-items: center;
+  font-size: var(--t-micro);
+  color: var(--ink-2);
+  overflow: hidden;
+}
+.who__name {
+  font-size: var(--t-base);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.who__rule { width: 1px; height: 1rem; background: var(--rule); flex: 0 0 auto; }
+
+.btn-quiet {
+  border: 0; background: none; padding: 0;
+  font: 500 var(--t-micro) / 1.15 var(--font-sans);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-2); cursor: pointer;
+  transition: color var(--dur-1) linear;
+}
+.btn-quiet:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+/* ----------------------------------------------------------------- hero -- */
+
+.hero {
+  position: relative;                       /* anchors the re-mark hairline */
+  padding-block: var(--s8) var(--s7);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.hero__figure {
+  display: flex; align-items: baseline;
+  margin-top: var(--s3);
+  font: 500 var(--t-hero) / 1 var(--font-mono);
+  font-feature-settings: 'zero' 1, 'tnum' 1;
+  font-variant-numeric: tabular-nums slashed-zero;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+.hero__figure .amt { display: inline-flex; align-items: baseline; }
+/* Cents at roughly two-fifths the size of the units, sharing the mono baseline —
+   no superscript, no vertical-align tricks. */
+.hero__figure .amt__frac { font-size: 0.45em; letter-spacing: 0; }
+
+.hero__unit {
+  margin-left: var(--s3);
+  font: 500 var(--t-micro) / 1 var(--font-sans);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* The one "celebration" in the product: a hairline drawn under the new figure.
+   Explicitly not a count-up — animating a balance through values it never held
+   is a lie, and this software is about not lying about numbers. */
+.hero.is-remarked::after {
+  content: '';
+  position: absolute; left: 0; bottom: var(--s6);
+  width: min(20rem, 60%); height: 1px;
+  background: var(--accent);
+  transform-origin: left;
+  animation: remark 720ms var(--ease) forwards;
+}
+@keyframes remark {
+  0%   { transform: scaleX(0); opacity: 1; }
+  45%  { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+.hero__meta {
+  display: flex; flex-wrap: wrap; gap: var(--s5);
+  margin-top: var(--s5);
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+}
+.meta { display: inline-flex; align-items: center; gap: var(--s2); }
+.meta__key {
+  font-size: var(--t-micro);
+  letter-spacing: 0.14em; text-transform: uppercase;
+}
+
+.copy {
+  width: 1.5rem; height: 1.5rem;
+  display: inline-grid; place-items: center; position: relative;
+  border: 1px solid transparent; border-radius: var(--r);
+  background: none; color: var(--ink-3); cursor: pointer;
+  transition: border-color var(--dur-1) linear, color var(--dur-1) linear;
+}
+.copy:hover { border-color: var(--rule-strong); color: var(--ink-2); }
+.copy__done {
+  position: absolute; left: calc(100% + var(--s2));
+  font-size: var(--t-micro); letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--success); white-space: nowrap;
+  opacity: 0; transition: opacity var(--dur-1) linear;
+}
+.copy.is-done .copy__icon { color: var(--success); }
+.copy.is-done .copy__done { opacity: 1; }
+
+/* -------------------------------------------------------------- columns -- */
+
+/* The structural move of the whole design: 6rem of air with a single hairline
+   down its centre. That gutter is what says "these are two things" — which is
+   why neither side needs to be a card. */
+.columns {
+  display: grid;
+  grid-template-columns: 20rem minmax(0, 1fr);
+  padding-block: var(--s7);
+}
+.col--form { padding-right: var(--s7); }
+.col--ledger { border-left: 1px solid var(--rule-strong); padding-left: var(--s7); }
+
+.section-head {
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--rule-strong);
+  margin-bottom: var(--s5);
+}
+.section-head--row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); }
+
+/* ----------------------------------------------------------------- form -- */
+
+.field { display: grid; gap: var(--s2); margin-bottom: var(--s5); }
+.field__row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
+
+.field label, .seg legend {
+  font-size: var(--t-micro);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 500;
+}
+.field__aside { font-size: var(--t-xs); color: var(--ink-3); }
+.field__aside.is-met { color: var(--accent); }
+
+/* Transparent fills, never a grey box: the paper shows through every control,
+   which is what keeps the page reading as a single sheet. */
+.input {
+  width: 100%; height: 2.75rem;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--field);
+  border-radius: var(--r);
+  padding-inline: var(--s3);
+  font: 400 var(--t-base) / 1.4 var(--font-sans);
+  transition: border-color var(--dur-1) linear;
+}
+.input.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'zero' 1, 'tnum' 1;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+/* Right-aligned numeric entry is the clearest possible signal that this is
+   accounting software and not a checkout. */
+.input--amount {
+  height: 3.25rem;
+  font-size: var(--t-amount); font-weight: 500;
+  text-align: right;
+}
+.input::placeholder { color: var(--ink-3); }
+.input:hover { border-color: color-mix(in oklab, var(--field) 70%, var(--ink)); }
+.input:focus-visible { border-color: var(--accent); outline-offset: 1px; }
+.input[aria-invalid='true'] { border-color: var(--danger); }
+.input:-webkit-autofill {
+  -webkit-text-fill-color: var(--ink);
+  box-shadow: inset 0 0 0 100px var(--paper);
+}
+
+.hint { font-size: var(--t-xs); color: var(--ink-3); }
+
+/* Errors are prefixed by an 8px hairline rather than an icon — the same
+   language as the rest of the page, at the smallest size it can be drawn. */
+.err { font-size: var(--t-sm); color: var(--danger); }
+.err::before {
+  content: ''; display: inline-block;
+  width: 0.5rem; height: 1px; background: currentColor;
+  vertical-align: 0.28em; margin-right: 0.375rem;
+}
+
+/* Exactly two options, so a <select> would be hiding one of them. */
+.seg__row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--field);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.seg__opt {
+  height: 2.75rem;
+  display: grid; place-items: center;
+  font: 500 var(--t-sm) / 1 var(--font-mono);
+  letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ink-2); cursor: pointer;
+  transition: color var(--dur-1) linear, box-shadow 140ms var(--ease);
+}
+.seg__opt + .seg__opt { border-left: 1px solid var(--field); }
+/* Marked by a 2px bar, never by a filled segment. */
+.seg__opt:has(input:checked) { color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.seg__opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+/* The one solid element in the design is solid ink — which inverts with the
+   ground automatically, because both ends are tokens. */
+.btn {
+  position: relative; overflow: hidden;
+  width: 100%; height: 2.75rem;
+  background: var(--ink); color: var(--paper);
+  border: 1px solid var(--ink); border-radius: var(--r);
+  font: 500 var(--t-base) / 1 var(--font-sans);
+  letter-spacing: 0.02em; cursor: pointer;
+  transition: background-color var(--dur-1) linear, color var(--dur-1) linear;
+}
+.btn:hover:not(:disabled) { background: color-mix(in oklab, var(--ink) 88%, var(--paper)); }
+.btn:disabled {
+  background: transparent; color: var(--ink-3);
+  border-color: var(--rule-strong); cursor: not-allowed;
+}
+.btn[aria-busy='true'] { color: color-mix(in oklab, var(--paper) 60%, var(--ink)); }
+/* A rule sweeping the button's edge, not a spinner. */
+.btn[aria-busy='true']::after {
+  content: ''; position: absolute; inset-inline: 0; bottom: 0; height: 1px;
+  background: var(--paper); transform-origin: left;
+  animation: sweep 900ms linear infinite;
+}
+@keyframes sweep { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* --------------------------------------------------------------- notice -- */
+
+/* 0fr → 1fr: the page makes room for the notice instead of the notice
+   covering the page. Nothing in this design floats. */
+.notice-slot {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-2) var(--ease);
+}
+.notice-slot.is-open { grid-template-rows: 1fr; }
+.notice-clip { overflow: hidden; }
+.notice { margin-bottom: var(--s5); }
+
+.notice-slot.is-open .notice {
+  border-left: 2px solid var(--tone, var(--accent));
+  border-radius: 0 var(--r) var(--r) 0;
+  background: var(--tone-wash, var(--accent-wash));
+  padding: var(--s3) var(--s4);
+}
+.notice__title { font-size: var(--t-sm); font-weight: 600; color: var(--ink); }
+.notice__body {
+  margin-top: var(--s1);
+  font: 400 var(--t-sm) / 1.5 var(--font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+/* The HTTP response header, quoted verbatim. Showing the wire truth instead of
+   a friendly paraphrase is the most trust-building line in the app. */
+.chip {
+  display: inline-block; margin-top: var(--s2);
+  font: 400 var(--t-micro) / 1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  border-radius: var(--r);
+  padding: 0.125rem 0.375rem;
+}
+
+/* --------------------------------------------------------------- ledger -- */
+
+.ledger { position: relative; }
+
+/* Both the head row and every entry set the mono metric on themselves, so the
+   `ch` units in their grid templates and the `ch` offset of the axis below all
+   resolve against one and the same font. This is the whole trick. */
+.ledger__head, .ledger__row {
+  display: grid;
+  grid-template-columns: 12ch minmax(0, 1fr) 8ch minmax(17ch, max-content);
+  align-items: center;
+  column-gap: var(--s3);
+  font: 500 var(--t-amount) / 1 var(--font-mono);
+}
+.ledger__head {
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--rule-strong);
+}
+.ledger__head > span {
+  font: 500 var(--t-micro) / 1.15 var(--font-sans);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ta-r { text-align: right; }
+
+/* THE DECIMAL AXIS.
+   One hairline where every decimal point lands. It sits 8ch in from the right
+   edge because each amount reserves 9ch for its integer half and 8ch for its
+   fraction half, so the split is at a fixed distance from the right no matter
+   the magnitude — which is the same reason accountants rule their ledgers.
+   It stays drawn through the empty state: a blank statement still has columns. */
+.ledger__body { position: relative; }
+.ledger__body::before {
+  content: '';
+  position: absolute; top: 0; bottom: 0; right: 8ch;
+  width: 1px; background: var(--axis);
+  pointer-events: none;
+  /* `ch` resolves against this element's own font, so it must be the same font,
+     size and weight the amounts are set in -- otherwise the line and the digits
+     are measuring in different units. */
+  font: 500 var(--t-amount) / 1 var(--font-mono);
+}
+
+.ledger__row {
+  min-height: 3.25rem;
+  padding-block: var(--s3);
+  border-bottom: 1px solid var(--rule);
+  animation: row-in var(--dur-2) var(--ease);
+}
+.ledger__row:last-child { border-bottom: 0; }
+@keyframes row-in { from { opacity: 0; } to { opacity: 1; } }
+
+.tx__dest { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.tx__when {
+  font: 400 var(--t-xs) / 1.3 var(--font-mono);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.tx__addr {
+  font: 400 var(--t-sm) / 1.3 var(--font-mono);
+  color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: color var(--dur-1) linear;
+}
+.ledger__row:hover .tx__addr { color: var(--ink); }
+
+/* A hairline chip with no fill. Colour-coding two networks would be the first
+   crack in the monochrome, and the six characters are the whole signal. */
+.badge {
+  flex: 0 0 auto;
+  font: 400 var(--t-micro) / 1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r);
+  padding: 0.125rem 0.375rem;
+}
+
+/* Filled square vs hollow square, plus the word — so the states survive
+   greyscale, colour blindness and a printed page. */
+.status {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  font: 400 var(--t-micro) / 1.15 var(--font-mono);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-2); white-space: nowrap;
+}
+.status::before { content: ''; width: 6px; height: 6px; flex: 0 0 auto; }
+.status--completed::before { background: var(--success); }
+.status--failed::before { background: var(--danger); }
+.status--pending::before { border: 1px solid var(--ink-3); }
+
+/* The amount, in two cells of fixed character width. */
+.amt {
+  display: grid;
+  /* The integer half may grow leftward but never shrinks below 9ch, and the
+     fraction half is always exactly 8ch, which is what keeps the decimal axis
+     at a fixed offset from the row's right edge no matter the magnitude.
+     A fixed 9ch would clip a large number into a different number. */
+  grid-template-columns: minmax(9ch, max-content) 8ch;
+  color: var(--ink);
+}
+.amt__int { text-align: right; white-space: nowrap; }
+.amt__frac { text-align: left; overflow: hidden; color: var(--ink-2); }
+/* Digits the server did not send. "0.2" and "0.20" are different facts, so a
+   pad digit must never be printed in the same ink as a digit that was sent. */
+.amt__pad { opacity: 0.35; }
+/* Precision beyond the second decimal, recessed rather than dropped. */
+.amt__tail { color: var(--ink-3); }
+
+/* A struck figure carries the whole meaning of "recorded, but not charged". */
+.ledger__row--failed .amt,
+.ledger__row--failed .amt__frac { color: var(--ink-3); }
+.ledger__row--failed .amt {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in oklab, var(--danger) 55%, transparent);
+}
+
+/* The row a replay pointed at. Marked, then released. */
+.ledger__row--recalled { background: var(--accent-wash); animation: recall 1600ms var(--ease) forwards; }
+@keyframes recall { 0%, 55% { background: var(--accent-wash); } 100% { background: transparent; } }
+
+.empty { padding-block: var(--s7); }
+.empty__rule { width: 2rem; }
+.empty__title { margin-top: var(--s4); color: var(--ink-2); }
+.empty__body { margin-top: var(--s1); font-size: var(--t-sm); color: var(--ink-3); max-width: 32ch; }
+
+/* --------------------------------------------------------------- reflow -- */
+
+@media (max-width: 60rem) {
+  /* The vertical rule rotates into a horizontal one — same role, same token. */
+  .columns { grid-template-columns: 1fr; padding-block: var(--s6); }
+  .col--form { padding-right: 0; }
+  .col--ledger {
+    border-left: 0; padding-left: 0;
+    margin-top: var(--s7); padding-top: var(--s7);
+    border-top: 1px solid var(--rule-strong);
+  }
+}
+
+@media (max-width: 34rem) {
+  .hero { padding-block: var(--s6) var(--s5); }
+  .who__name { display: none; }
+
+  /* Two lines, but the amount keeps its cell and stays hard right, so the
+     decimal axis survives the reflow untouched. */
+  .ledger__head, .ledger__row {
+    grid-template-columns: minmax(0, 1fr) minmax(17ch, max-content);
+    row-gap: var(--s2);
+  }
+  .ledger__head > span:nth-child(2),
+  .ledger__head > span:nth-child(3) { display: none; }
+  .tx__when { grid-area: 1 / 1; }
+  .amt      { grid-area: 1 / 2; }
+  .tx__dest { grid-area: 2 / 1; }
+  .status   { grid-area: 2 / 2; justify-self: end; }
+  .tx__addr { font-size: var(--t-xs); }
+  .colophon { flex-direction: column; gap: var(--s1); }
+}
+
+/* Meaning survives the cut in every case: the pending square is already
+   distinguished by being hollow, the busy button still carries aria-busy, and
+   a recalled row keeps a persistent outline instead of a fading wash — because
+   when an animation is the only cue, it has to become a static mark. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ledger__row--recalled {
+    background: var(--accent-wash);
+    outline: 1px dashed var(--accent);
+    outline-offset: -1px;
+  }
+  /* An animation with fill: forwards outranks these declarations, so it has to
+     be switched off before the persistent hairline can be drawn at all. */
+  .hero.is-remarked::after { animation: none; opacity: 1; transform: none; }
+}

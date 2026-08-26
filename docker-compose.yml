@@ -28,6 +28,14 @@ services:
     environment:
       DATABASE_URL: postgres://ledger:ledger@db:5432/ledger
       PORT: '3000'
+      # Google sign-in. Unset is a supported state: the UI says so on its sign-in screen
+      # instead of failing, so the stack still comes up for someone without a client id.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # Signs the session cookie. Unset means a random one per boot, so sessions end with
+      # the container -- fine for a demo, set it for anything longer lived.
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      # Simulated funds a new account opens with, so a fresh sign-in has something to withdraw.
+      SIGNUP_BALANCE: ${SIGNUP_BALANCE:-1000}
     ports:
       - '3000:3000'
 
