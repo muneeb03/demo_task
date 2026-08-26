@@ -1,3 +1,5 @@
+// The one error type the API layer renders as JSON. Anything else that escapes becomes a
+// generic 500, so an unexpected failure cannot leak internals to the caller.
 /** An error carrying the HTTP status and machine-readable code to return to the caller. */
 export class ApiError extends Error {
   constructor(

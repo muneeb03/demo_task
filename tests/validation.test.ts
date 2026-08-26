@@ -1,3 +1,5 @@
+// Everything the API must refuse. Mostly table-driven; the recurring theme is that a
+// rejection leaves nothing behind -- no ledger row, no balance change, no consumed key.
 import {
   api,
   createAccount,
@@ -27,6 +29,7 @@ const fieldsIn = (body: { error: { details?: Array<{ field: string }> } }): stri
 
 describe('address validation', () => {
   const badAddresses: Case[] = [
+    // The first two matter most: each address is valid on its own, only the pairing is wrong.
     ['an ERC20 address on the TRC20 network', { address: VALID_ERC20, network: 'TRC20' }],
     ['a TRC20 address on the ERC20 network', { address: VALID_TRC20, network: 'ERC20' }],
     ['a TRC20 address that is too short', { address: VALID_TRC20.slice(0, -1), network: 'TRC20' }],
@@ -81,6 +84,7 @@ describe('withdrawal body validation', () => {
     expect(fieldsIn(res.body)).toContain('amount');
   });
 
+  // The anti-fail-fast test: one round trip to learn about all four problems.
   it('reports every missing field at once', async () => {
     const account = await createAccount('missing-fields', 100);
     const res = await withdraw(account.id, {}).expect(400);
@@ -122,6 +126,7 @@ describe('insufficient funds', () => {
     expect(history[0]).toMatchObject({ status: 'failed', amount: '50.01' });
   });
 
+  // The boundary: the rule is balance >= amount, not >.
   it('allows a withdrawal of the entire balance', async () => {
     const account = await createAccount('exact-balance', 50);
     await withdraw(account.id, valid({ amount: 50 })).expect(201);

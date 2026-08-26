@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Crypto Ledger</title>
+<meta name="description" content="A settlement ledger for TRC20 and ERC20 withdrawals." />
+<meta name="color-scheme" content="light dark" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<!-- Announcements that have no visible home of their own. -->
+<p class="sr-only" role="status" aria-live="polite" id="live"></p>
+
+<!-- ============================ SIGN IN ============================ -->
+<main class="signin" id="view-signin" hidden>
+  <div class="signin__col">
+    <hr class="rule rule--strong" />
+    <h1 class="wordmark" id="signin-heading" tabindex="-1">Crypto Ledger</h1>
+    <p class="lede">
+      A settlement ledger for TRC20 and ERC20 withdrawals. Balances are exact to the last decimal.
+    </p>
+
+    <div class="signin__slot">
+      <!-- Google renders its button into this element. The frame is ours; the button is theirs. -->
+      <div class="gis" id="gis"></div>
+
+      <div class="fallback" id="gis-fallback" hidden>
+        <p class="fallback__title" id="gis-fallback-title"></p>
+        <p class="fallback__body" id="gis-fallback-body"></p>
+      </div>
+    </div>
+
+    <hr class="rule" />
+    <p class="note">We read your name, email and picture. Nothing else.</p>
+  </div>
+
+  <footer class="colophon">
+    <span>Crypto Ledger — settlement simulator</span>
+    <span class="mono">TRC20 · ERC20</span>
+  </footer>
+</main>
+
+<!-- ============================ DASHBOARD ============================ -->
+<div id="view-app" hidden>
+
+  <header class="masthead">
+    <div class="masthead__inner">
+      <span class="wordmark wordmark--sm">Crypto Ledger</span>
+      <div class="who">
+        <span class="avatar" id="avatar"></span>
+        <span class="who__name" id="user-name"></span>
+        <span class="who__rule" aria-hidden="true"></span>
+        <button type="button" class="btn-quiet" id="signout">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+
+    <section class="hero">
+      <p class="eyebrow">Available balance</p>
+      <output class="hero__figure" id="balance" aria-label="Available balance"></output>
+      <div class="hero__meta">
+        <span class="meta">
+          <span class="meta__key">Account</span>
+          <span class="mono" id="account-id"></span>
+          <button type="button" class="copy" id="copy" aria-label="Copy full account id">
+            <svg class="copy__icon" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1">
+              <rect x="1.5" y="1.5" width="6.5" height="6.5" /><rect x="4" y="4" width="6.5" height="6.5" />
+            </svg>
+            <span class="copy__done" aria-hidden="true">copied</span>
+          </button>
+        </span>
+        <span class="meta">
+          <span class="meta__key">As of</span>
+          <time class="mono" id="as-of"></time>
+        </span>
+      </div>
+    </section>
+
+    <div class="columns">
+
+      <!-- ---------------- withdraw ---------------- -->
+      <section class="col col--form">
+        <h2 class="eyebrow section-head">Withdraw</h2>
+
+        <!-- 0fr -> 1fr: the page makes room for the notice rather than the notice covering the page. -->
+        <div class="notice-slot" id="notice-slot">
+          <div class="notice-clip">
+            <!-- Not a live region itself: #live is the single announcer, or every
+                 notice is read out twice. -->
+            <div class="notice" id="notice"></div>
+          </div>
+        </div>
+
+        <form id="form" novalidate>
+          <div class="field">
+            <div class="field__row">
+              <label for="amount">Amount</label>
+              <span class="field__aside mono">USDT</span>
+            </div>
+            <input class="input input--amount mono" id="amount" name="amount" type="text"
+                   inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="0.00" />
+            <p class="err" id="err-amount" hidden></p>
+          </div>
+
+          <fieldset class="field seg">
+            <legend>Network</legend>
+            <div class="seg__row">
+              <label class="seg__opt">
+                <input type="radio" name="network" value="TRC20" class="sr-only" checked />
+                <span>TRC20</span>
+              </label>
+              <label class="seg__opt">
+                <input type="radio" name="network" value="ERC20" class="sr-only" />
+                <span>ERC20</span>
+              </label>
+            </div>
+            <p class="err" id="err-network" hidden></p>
+          </fieldset>
+
+          <div class="field">
+            <div class="field__row">
+              <label for="address">Destination address</label>
+              <span class="field__aside mono" id="counter"></span>
+            </div>
+            <input class="input mono" id="address" name="address" type="text"
+                   autocomplete="off" autocapitalize="off" spellcheck="false" />
+            <p class="hint mono" id="hint"></p>
+            <p class="err" id="err-address" hidden></p>
+          </div>
+
+          <button class="btn" id="submit" type="submit">Withdraw</button>
+        </form>
+      </section>
+
+      <!-- ---------------- ledger ---------------- -->
+      <section class="col col--ledger">
+        <div class="section-head section-head--row">
+          <h2 class="eyebrow">Transactions</h2>
+          <span class="eyebrow" id="tx-count"></span>
+        </div>
+
+        <div class="ledger">
+          <div class="ledger__head" aria-hidden="true">
+            <span>Date · UTC</span><span>Destination</span><span>Status</span><span class="ta-r">Amount</span>
+          </div>
+          <div class="ledger__body">
+            <ol id="tx-list"></ol>
+            <div class="empty" id="tx-empty" hidden>
+              <hr class="rule rule--strong empty__rule" />
+              <p class="empty__title">No transactions yet.</p>
+              <p class="empty__body">
+                Your first withdrawal will be recorded here — including attempts that fail for
+                insufficient funds.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="colophon colophon--app">
+    <span>Crypto Ledger — settlement simulator</span>
+    <span class="mono">Amounts are exact decimals, never floats</span>
+  </footer>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -21,6 +21,8 @@ COPY --from=build /app/dist ./dist
 # src/migrate.ts resolves db/schema.sql relative to the compiled output, so the
 # schema ships with the image and a fresh database migrates itself on startup.
 COPY db ./db
+# The web UI is plain static files -- no build step, so they are copied as they are.
+COPY public ./public
 
 USER node
 EXPOSE 3000

@@ -1,3 +1,4 @@
+// The core claim: simultaneous withdrawals can never overdraw an account.
 import {
   createAccount,
   getBalance,
@@ -51,6 +52,7 @@ describe('concurrent withdrawals', () => {
     expect(completed).toHaveLength(3);
     expect(failed).toHaveLength(7);
 
+    // Money is conserved: starting balance minus what was debited is what remains.
     const debited = completed.reduce((sum, tx) => sum + Number(tx.amount), 0);
     expect(Number(account.balance) - debited).toBe(balance);
   });

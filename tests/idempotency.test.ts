@@ -1,3 +1,4 @@
+// Replay semantics: the same key must never move money twice, sequentially or under a race.
 import {
   createAccount,
   getBalance,
@@ -23,6 +24,7 @@ describe('idempotency', () => {
     const second = await withdraw(account.id, body).expect(201);
 
     expect(second.body).toEqual(first.body);
+    // The header is what proves the second response came from storage, not a second run.
     expect(first.headers['idempotent-replay']).toBeUndefined();
     expect(second.headers['idempotent-replay']).toBe('true');
 
@@ -63,6 +65,7 @@ describe('idempotency', () => {
     expect(await getBalance(account.id)).toBe(50);
   });
 
+  // Returning the stored 100 to a request that asked for 200 would be the worst answer.
   it('refuses a key that is reused with different parameters', async () => {
     const account = await createAccount('idempotent-mismatch', 300);
     const key = uniqueKey('mismatch');

@@ -1,3 +1,5 @@
+// The single Postgres pool for the whole process. Its size caps how many withdrawals
+// can be in flight, so the tests depend on it being wider than their concurrency burst.
 import { Pool } from 'pg';
 
 export const DEFAULT_DATABASE_URL = 'postgres://ledger:ledger@localhost:5433/ledger';

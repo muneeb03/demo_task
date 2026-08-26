@@ -1,3 +1,5 @@
+// Request parsing. Every field is checked before anything is thrown, so a client fixing a
+// four-field mistake needs one round trip rather than four.
 import { ApiError } from './errors';
 
 /**
@@ -45,7 +47,10 @@ const assertNoErrors = (errors: FieldError[]): void => {
   }
 };
 
-/** Path parameters are validated before they reach the database. */
+/**
+ * Path parameters are validated before they reach the database. A malformed id is the
+ * client's mistake (400); a well-formed id that does not exist is a lookup miss (404).
+ */
 export function parseAccountId(raw: string | undefined): string {
   if (typeof raw !== 'string' || !UUID_RE.test(raw)) {
     throw new ApiError(400, 'INVALID_ACCOUNT_ID', 'Account id must be a UUID.');

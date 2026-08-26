@@ -1,3 +1,6 @@
+// Runs once before the suite: wait for Postgres, create the database, apply the schema,
+// truncate. Truncation is per run rather than per test, which is why every test creates
+// its own account and why helpers.uniqueKey() exists.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client } from 'pg';
@@ -57,7 +60,10 @@ export default async function globalSetup(): Promise<void> {
   try {
     await db.query(readFileSync(join(__dirname, '..', 'db', 'schema.sql'), 'utf8'));
     // Every run starts from a clean ledger.
-    await db.query('TRUNCATE transactions, accounts RESTART IDENTITY CASCADE');
+    // users is listed explicitly: accounts references it, not the other way
+    // round, so CASCADE from accounts never reaches it and google_sub rows would
+    // survive to collide with the next run's.
+    await db.query('TRUNCATE transactions, accounts, users RESTART IDENTITY CASCADE');
   } finally {
     await db.end();
   }

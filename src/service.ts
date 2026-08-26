@@ -1,3 +1,5 @@
+// The data layer, and the only place where correctness is subtle. Concurrency safety and
+// idempotency are both enforced by Postgres rather than by application code.
 import type { PoolClient } from 'pg';
 import { pool } from './db';
 import { accountNotFound, ApiError } from './errors';
@@ -76,6 +78,7 @@ const SETTLE = 'UPDATE transactions SET status = $2 WHERE id = $1 RETURNING *';
  * (transactions.account_id, transactions.idempotency_key).
  */
 export async function withdraw(accountId: string, input: WithdrawalInput): Promise<WithdrawalResult> {
+  // A dedicated client, not pool.query: BEGIN/COMMIT only work on a single connection.
   const client = await pool.connect();
 
   try {
